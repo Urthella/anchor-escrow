@@ -1,0 +1,45 @@
+[package]
+name = "anchor-escrow"
+version = "0.1.0"
+edition = "2021"
+description = "Token escrow on Solana: lock token A, name a price in token B, settle atomically"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "anchor_escrow"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+
+[dependencies]
+anchor-lang = { version = "1.2.2", features = ["init-if-needed"] }
+anchor-spl = "1.2.2"
+
+[dev-dependencies]
+litesvm = "0.18.1"
+litesvm-token = "0.18.1"
+solana-keypair = "3"
+solana-signer = "3"
+solana-transaction = "4"
+solana-instruction = "~3.5"
+# litesvm 0.18 was built against Agave 4.3, but its ^4.3 ranges also accept Agave 4.4, which broke
+# its API. Agave crates pin each other exactly, so holding these roots at 4.3 holds the whole family.
+agave-feature-set = "~4.3"
+solana-program-runtime = "~4.3"
+solana-builtins = "~4.3"
+solana-runtime-transaction = "~4.3"
+solana-compute-budget-instruction = "~4.3"
+solana-transaction-context = "~4.3"
+solana-fee = "~4.3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

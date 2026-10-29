@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cache/solana
+            target
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Install the Agave (Solana) toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v4.0.3/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build-sbf
+      - run: cargo test
