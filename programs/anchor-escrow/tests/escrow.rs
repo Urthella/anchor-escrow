@@ -7,6 +7,7 @@ use litesvm_token::{
     get_spl_account, spl_token::state::Account as TokenAccount, CreateAssociatedTokenAccount,
     CreateMint, MintTo,
 };
+use solana_clock::Clock;
 use solana_instruction::Instruction;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -124,7 +125,7 @@ impl World {
     }
 
     fn make(&mut self, seed: u64, deposit: u64, receive: u64) -> Result<(), String> {
-        self.make_with(seed, deposit, receive, self.mint_b)
+        self.make_with(seed, deposit, receive, self.mint_b, 0)
     }
 
     fn make_with(
@@ -133,6 +134,7 @@ impl World {
         deposit: u64,
         receive: u64,
         mint_b: Pubkey,
+        expires_at: i64,
     ) -> Result<(), String> {
         let (maker, escrow) = (self.maker.pubkey(), self.escrow(seed));
         let metas = accounts::Make {
@@ -153,11 +155,18 @@ impl World {
                 seed,
                 deposit,
                 receive,
+                expires_at,
             }
             .data(),
             metas,
             &maker_kp,
         )
+    }
+
+    fn set_time(&mut self, unix_timestamp: i64) {
+        let mut clock: Clock = self.svm.get_sysvar();
+        clock.unix_timestamp = unix_timestamp;
+        self.svm.set_sysvar(&clock);
     }
 
     fn take(&mut self, seed: u64, mint_b: Pubkey) -> Result<(), String> {
@@ -310,9 +319,43 @@ fn make_rejects_zero_amounts_and_a_single_mint() {
     );
     let mint_a = w.mint_a;
     assert!(
-        w.make_with(3, 1_000, 500, mint_a)
+        w.make_with(3, 1_000, 500, mint_a, 0)
             .unwrap_err()
             .contains("Custom(6001)"),
         "SameMint"
     );
+}
+
+#[test]
+fn an_offer_can_be_taken_until_it_expires() {
+    let mut w = World::new(TOKEN);
+    w.set_time(1_000_000);
+    let mint_b = w.mint_b;
+    w.make_with(4, 1_000, 500, mint_b, 1_000_100).unwrap();
+    w.set_time(1_000_099);
+    w.take(4, mint_b).unwrap();
+    assert_eq!(w.balance(&w.taker.pubkey(), &w.mint_a), 1_000);
+}
+
+#[test]
+fn an_expired_offer_cannot_be_taken_but_can_be_refunded() {
+    let mut w = World::new(TOKEN);
+    w.set_time(1_000_000);
+    let mint_b = w.mint_b;
+    w.make_with(5, 1_000, 500, mint_b, 1_000_100).unwrap();
+    w.set_time(1_000_100); // the deadline itself is already too late
+    let err = w.take(5, mint_b).unwrap_err();
+    assert!(err.contains("Custom(6002)"), "Expired, got {err}");
+    let maker = w.maker.insecure_clone();
+    w.refund(5, &maker).unwrap();
+    assert_eq!(w.balance(&maker.pubkey(), &w.mint_a), 1_000);
+}
+
+#[test]
+fn make_rejects_an_expiry_in_the_past() {
+    let mut w = World::new(TOKEN);
+    w.set_time(1_000_000);
+    let mint_b = w.mint_b;
+    let err = w.make_with(6, 1_000, 500, mint_b, 1_000_000).unwrap_err();
+    assert!(err.contains("Custom(6003)"), "ExpiryInPast, got {err}");
 }

@@ -31,6 +31,7 @@ solana-keypair = "3"
 solana-signer = "3"
 solana-transaction = "4"
 solana-instruction = "~3.5"
+solana-clock = "~3.2"
 # litesvm 0.18 was built against Agave 4.3, but its ^4.3 ranges also accept Agave 4.4, which broke
 # its API. Agave crates pin each other exactly, so holding these roots at 4.3 holds the whole family.
 agave-feature-set = "~4.3"
