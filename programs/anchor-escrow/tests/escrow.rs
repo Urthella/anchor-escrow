@@ -280,12 +280,15 @@ fn take_must_pay_in_the_mint_the_maker_asked_for() {
     let taker = w.taker.insecure_clone();
     let fake = CreateMint::new(&mut w.svm, &taker)
         .decimals(9)
+        .token_program_id(&TOKEN)
         .send()
         .unwrap();
     let fake_ata = CreateAssociatedTokenAccount::new(&mut w.svm, &taker, &fake)
+        .token_program_id(&TOKEN)
         .send()
         .unwrap();
     MintTo::new(&mut w.svm, &taker, &fake, &fake_ata, 500)
+        .token_program_id(&TOKEN)
         .send()
         .unwrap();
 

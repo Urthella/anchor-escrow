@@ -26,7 +26,8 @@ anchor-spl = "1.2.2"
 
 [dev-dependencies]
 litesvm = "0.18.1"
-litesvm-token = "0.18.1"
+# Without this feature its instruction builders reject the Token-2022 program id.
+litesvm-token = { version = "0.18.1", features = ["token-2022"] }
 solana-keypair = "3"
 solana-signer = "3"
 solana-transaction = "4"
