@@ -16,12 +16,23 @@ pub mod anchor_escrow {
     use super::*;
 
     /// Locks `deposit` of mint A in a vault owned by the escrow and asks `receive` of mint B for it.
-    pub fn make(ctx: Context<Make>, seed: u64, deposit: u64, receive: u64) -> Result<()> {
+    /// `expires_at` is a unix timestamp after which the offer can't be taken; 0 means never.
+    pub fn make(
+        ctx: Context<Make>,
+        seed: u64,
+        deposit: u64,
+        receive: u64,
+        expires_at: i64,
+    ) -> Result<()> {
         require!(deposit > 0 && receive > 0, EscrowError::ZeroAmount);
         require_keys_neq!(
             ctx.accounts.mint_a.key(),
             ctx.accounts.mint_b.key(),
             EscrowError::SameMint
+        );
+        require!(
+            expires_at == 0 || expires_at > Clock::get()?.unix_timestamp,
+            EscrowError::ExpiryInPast
         );
         ctx.accounts.escrow.set_inner(Escrow {
             seed,
@@ -29,6 +40,7 @@ pub mod anchor_escrow {
             mint_a: ctx.accounts.mint_a.key(),
             mint_b: ctx.accounts.mint_b.key(),
             receive,
+            expires_at,
             bump: ctx.bumps.escrow,
         });
         let a = &ctx.accounts;
@@ -50,6 +62,11 @@ pub mod anchor_escrow {
     /// Pays the maker `receive` of mint B, hands the whole vault to the taker, and closes the escrow.
     pub fn take(ctx: Context<Take>) -> Result<()> {
         let a = &ctx.accounts;
+        // An expired offer stays refundable; it just can't be taken any more.
+        require!(
+            a.escrow.expires_at == 0 || Clock::get()?.unix_timestamp < a.escrow.expires_at,
+            EscrowError::Expired
+        );
         transfer_checked(
             CpiContext::new(
                 a.token_program.key(),
@@ -132,6 +149,7 @@ pub struct Escrow {
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
     pub receive: u64,
+    pub expires_at: i64,
     pub bump: u8,
 }
 
@@ -141,6 +159,10 @@ pub enum EscrowError {
     ZeroAmount,
     #[msg("the escrow must trade two different mints")]
     SameMint,
+    #[msg("this offer has expired")]
+    Expired,
+    #[msg("expires_at must be in the future, or 0 for never")]
+    ExpiryInPast,
 }
 
 #[derive(Accounts)]
